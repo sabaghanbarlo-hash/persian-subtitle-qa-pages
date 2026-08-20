@@ -408,7 +408,7 @@ function ReviewPage({ providerConfig, goSettings }) {
     const userPrompt = buildReviewUserPrompt({ en: item.en, fa: item.fa, prevEn, prevFa, nextEn, nextFa });
 
     try {
-      const rawText = await callConfiguredModelWithRetry(REVIEW_SYSTEM_PROMPT, userPrompt, 2);
+      const rawText = await callConfiguredModelWithRetry(REVIEW_SYSTEM_PROMPT, userPrompt, 4);
       const result = parseAndValidateReview(rawText);
       if (!result.valid) updateSubtitle(item.id, { status: 'error', error: result.error });
       else updateSubtitle(item.id, { status: 'reviewed', review: result.data });
