@@ -625,7 +625,7 @@ function ReviewPage({
       nextFa
     });
     try {
-      const rawText = await callConfiguredModelWithRetry(REVIEW_SYSTEM_PROMPT, userPrompt, 2);
+      const rawText = await callConfiguredModelWithRetry(REVIEW_SYSTEM_PROMPT, userPrompt, 4);
       const result = parseAndValidateReview(rawText);
       if (!result.valid) updateSubtitle(item.id, {
         status: 'error',
