@@ -373,7 +373,7 @@ async function callConfiguredModel(systemPrompt, userPrompt) {
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
 async function callConfiguredModelWithRetry(systemPrompt, userPrompt, maxRetries) {
-  maxRetries = maxRetries == null ? 2 : maxRetries;
+  maxRetries = maxRetries == null ? 4 : maxRetries;
   let lastErr;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -381,9 +381,15 @@ async function callConfiguredModelWithRetry(systemPrompt, userPrompt, maxRetries
     } catch (e) {
       lastErr = e;
       const msg = (e.message || '').toLowerCase();
-      const retryable = msg.includes('429') || msg.includes('rate') || msg.includes('timeout') || msg.includes('503') || msg.includes('overloaded');
+      // "Failed to fetch" / "NetworkError" / "Load failed" are the browser's generic
+      // messages for a connection that never completed (dropped, blocked, DNS hiccup,
+      // flaky VPN, etc.) rather than a real error from the provider — worth retrying,
+      // same as rate limits and timeouts.
+      const retryable = msg.includes('429') || msg.includes('rate') || msg.includes('timeout')
+        || msg.includes('503') || msg.includes('overloaded') || msg.includes('failed to fetch')
+        || msg.includes('networkerror') || msg.includes('load failed') || msg.includes('network request failed');
       if (!retryable || attempt === maxRetries) throw e;
-      await sleep(600 * Math.pow(2, attempt));
+      await sleep(800 * Math.pow(2, attempt));
     }
   }
   throw lastErr;
