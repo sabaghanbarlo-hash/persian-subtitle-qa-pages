@@ -97,6 +97,76 @@ function exportSRT(entries, textField) {
   )).join('\n');
 }
 
+// ---------------- ASS parsing ----------------
+// Reads [Events] Dialogue lines into the same {index, start, end, text} shape
+// as parseSRT, so ASS files can be paired and reviewed exactly like SRT.
+// Only used for reading uploads — export still produces .srt (ASS style/
+// formatting export isn't implemented yet).
+
+function stripAssTags(text) {
+  return (text || '')
+    .replace(/\{[^}]*\}/g, '')        // override tags like {\i1}, {\pos(...)}
+    .replace(/\\N/gi, '\n')           // ASS hard line break
+    .replace(/\\n/g, '\n')            // ASS soft line break
+    .replace(/\\h/g, ' ')             // ASS hard space
+    .trim();
+}
+
+function parseASS(text) {
+  const clean = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = clean.split('\n');
+  let inEvents = false;
+  let format = null;
+  const entries = [];
+  let dialogueIdx = 0;
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (/^\[Events\]/i.test(trimmed)) { inEvents = true; return; }
+    if (/^\[/.test(trimmed) && !/^\[Events\]/i.test(trimmed)) { inEvents = false; return; }
+    if (!inEvents) return;
+
+    if (/^Format:/i.test(trimmed)) {
+      format = trimmed.replace(/^Format:\s*/i, '').split(',').map((s) => s.trim());
+      return;
+    }
+    if (/^Dialogue:/i.test(trimmed)) {
+      const fields = format || ['Layer', 'Start', 'End', 'Style', 'Name', 'MarginL', 'MarginR', 'MarginV', 'Effect', 'Text'];
+      const rest = trimmed.replace(/^Dialogue:\s*/i, '');
+      const parts = rest.split(',');
+      const textIdx = fields.length - 1;
+      const head = parts.slice(0, textIdx);
+      const rawText = parts.slice(textIdx).join(',');
+
+      const startIdx = fields.findIndex((f) => f === 'Start');
+      const endIdx = fields.findIndex((f) => f === 'End');
+      const startStr = startIdx >= 0 ? head[startIdx] : head[1];
+      const endStr = endIdx >= 0 ? head[endIdx] : head[2];
+      if (!startStr || !endStr) return;
+
+      dialogueIdx += 1;
+      entries.push({
+        index: dialogueIdx,
+        start: timeToMs(startStr),
+        end: timeToMs(endStr),
+        text: stripAssTags(rawText),
+      });
+    }
+  });
+
+  return entries;
+}
+
+// Detect format from filename and parse into the normalized entry shape
+// used everywhere else in the app: {index, start, end, text}.
+function parseSubtitleFile(filename, text) {
+  const lower = (filename || '').toLowerCase();
+  if (lower.endsWith('.ass') || lower.endsWith('.ssa')) {
+    return { format: 'ass', entries: parseASS(text) };
+  }
+  return { format: 'srt', entries: parseSRT(text) };
+}
+
 function pairSubtitles(enEntries, faEntries) {
   const enByIndex = new Map(enEntries.map(e => [e.index, e]));
   const faByIndex = new Map(faEntries.map(e => [e.index, e]));
