@@ -548,9 +548,12 @@ function ReviewPage({
     if (!file) return;
     try {
       const text = await readFileAsText(file);
-      const entries = parseSRT(text);
+      const {
+        format,
+        entries
+      } = parseSubtitleFile(file.name, text);
       if (!entries.length) {
-        setParseError(`Couldn't find any valid subtitle entries in ${file.name}. Make sure it's a well-formed .srt file.`);
+        setParseError(`Couldn't find any valid subtitle entries in ${file.name}. Make sure it's a well-formed .srt or .ass file.`);
         return;
       }
       if (side === 'en') {
@@ -718,7 +721,7 @@ function ReviewPage({
     className: "page-title"
   }, "Subtitle review"), /*#__PURE__*/React.createElement("p", {
     className: "page-sub"
-  }, "Upload the English and Persian .srt files for one episode. Lines are paired by subtitle number, then reviewed with 2 lines of context on either side.")), !isConfigured && /*#__PURE__*/React.createElement("div", {
+  }, "Upload the English and Persian subtitle files for one episode (.srt or .ass, mix and match freely). Lines are paired by subtitle/dialogue order, then reviewed with 2 lines of context on either side.")), !isConfigured && /*#__PURE__*/React.createElement("div", {
     className: "warning-banner"
   }, "No AI provider configured yet. ", /*#__PURE__*/React.createElement("button", {
     className: "btn btn-sm",
@@ -730,9 +733,9 @@ function ReviewPage({
     className: "upload-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: `dropzone${enEntries ? ' filled' : ''}`
-  }, /*#__PURE__*/React.createElement("label", null, "English .srt"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("label", null, "English .srt / .ass"), /*#__PURE__*/React.createElement("input", {
     type: "file",
-    accept: ".srt",
+    accept: ".srt,.ass,.ssa",
     onChange: e => handleUpload('en', e.target.files[0])
   }), enEntries && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "filename"
@@ -740,9 +743,9 @@ function ReviewPage({
     className: "count"
   }, enEntries.length, " subtitle lines parsed"))), /*#__PURE__*/React.createElement("div", {
     className: `dropzone${faEntries ? ' filled' : ''}`
-  }, /*#__PURE__*/React.createElement("label", null, "Persian .srt"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("label", null, "Persian .srt / .ass"), /*#__PURE__*/React.createElement("input", {
     type: "file",
-    accept: ".srt",
+    accept: ".srt,.ass,.ssa",
     onChange: e => handleUpload('fa', e.target.files[0])
   }), faEntries && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "filename"
