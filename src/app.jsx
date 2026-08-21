@@ -356,9 +356,9 @@ function ReviewPage({ providerConfig, goSettings }) {
     if (!file) return;
     try {
       const text = await readFileAsText(file);
-      const entries = parseSRT(text);
+      const { format, entries } = parseSubtitleFile(file.name, text);
       if (!entries.length) {
-        setParseError(`Couldn't find any valid subtitle entries in ${file.name}. Make sure it's a well-formed .srt file.`);
+        setParseError(`Couldn't find any valid subtitle entries in ${file.name}. Make sure it's a well-formed .srt or .ass file.`);
         return;
       }
       if (side === 'en') { setEnName(file.name); setEnEntries(entries); }
@@ -464,7 +464,7 @@ function ReviewPage({ providerConfig, goSettings }) {
       <div className="page-head">
         <div className="page-eyebrow">New Review</div>
         <h1 className="page-title">Subtitle review</h1>
-        <p className="page-sub">Upload the English and Persian .srt files for one episode. Lines are paired by subtitle number, then reviewed with 2 lines of context on either side.</p>
+        <p className="page-sub">Upload the English and Persian subtitle files for one episode (.srt or .ass, mix and match freely). Lines are paired by subtitle/dialogue order, then reviewed with 2 lines of context on either side.</p>
       </div>
 
       {!isConfigured && (
@@ -477,13 +477,13 @@ function ReviewPage({ providerConfig, goSettings }) {
         <>
           <div className="upload-grid">
             <div className={`dropzone${enEntries ? ' filled' : ''}`}>
-              <label>English .srt</label>
-              <input type="file" accept=".srt" onChange={(e) => handleUpload('en', e.target.files[0])} />
+              <label>English .srt / .ass</label>
+              <input type="file" accept=".srt,.ass,.ssa" onChange={(e) => handleUpload('en', e.target.files[0])} />
               {enEntries && (<><div className="filename">{enName}</div><div className="count">{enEntries.length} subtitle lines parsed</div></>)}
             </div>
             <div className={`dropzone${faEntries ? ' filled' : ''}`}>
-              <label>Persian .srt</label>
-              <input type="file" accept=".srt" onChange={(e) => handleUpload('fa', e.target.files[0])} />
+              <label>Persian .srt / .ass</label>
+              <input type="file" accept=".srt,.ass,.ssa" onChange={(e) => handleUpload('fa', e.target.files[0])} />
               {faEntries && (<><div className="filename">{faName}</div><div className="count">{faEntries.length} subtitle lines parsed</div></>)}
             </div>
           </div>
