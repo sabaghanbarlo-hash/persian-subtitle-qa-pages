@@ -1,0 +1,15 @@
+{
+  "name": "persian-subtitle-qa-pages",
+  "private": true,
+  "description": "Dev tooling for building/testing this static site. Not needed to just view the deployed site.",
+  "scripts": {
+    "build": "babel src/app.jsx --config-file ./babel.config.json -o js/app.js",
+    "test": "node tests/test-lib.js && node tests/smoke-test.js && node tests/integration-test.js && node tests/integration-test-2.js"
+  },
+  "devDependencies": {
+    "@babel/cli": "^8.0.5",
+    "@babel/core": "^8.0.5",
+    "@babel/preset-react": "^8.0.1",
+    "jsdom": "^30.0.1"
+  }
+}
