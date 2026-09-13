@@ -352,7 +352,7 @@ ${nextBlock ? `FOLLOWING LINES (context only — do not review these):\n${nextBl
 Review only the CURRENT SUBTITLE above and respond with the JSON object only.`;
 }
 
-const VALID_SEVERITIES = new Set(['critical', 'major', 'minor', 'consistency', null, undefined]);
+const VALID_SEVERITIES = new Set(['critical', 'major', 'minor', 'consistency']);
 
 function parseAndValidateReview(rawText) {
   if (!rawText || typeof rawText !== 'string') {
@@ -375,27 +375,42 @@ function parseAndValidateReview(rawText) {
   if (!parsed || typeof parsed !== 'object') {
     return { valid: false, error: 'Model response was not a JSON object', raw: rawText };
   }
-  if (parsed.status !== 'correct' && parsed.status !== 'issue') {
-    return { valid: false, error: `Invalid "status" value: ${parsed.status}`, raw: rawText };
+
+  // Some models (especially reasoning models like openai/gpt-oss) are loose
+  // about the exact schema even when the JSON itself is valid. Infer status
+  // when it's missing rather than failing outright: a present, non-empty
+  // suggested_translation implies an issue was found.
+  let status = parsed.status;
+  if (status !== 'correct' && status !== 'issue') {
+    if (typeof parsed.suggested_translation === 'string' && parsed.suggested_translation.trim()) status = 'issue';
+    else if (status === undefined || status === null || status === '') status = 'correct';
+    else return { valid: false, error: `Invalid "status" value: ${parsed.status}`, raw: rawText };
   }
-  if (!VALID_SEVERITIES.has(parsed.severity)) {
-    return { valid: false, error: `Invalid "severity" value: ${parsed.severity}`, raw: rawText };
-  }
-  if (typeof parsed.explanation !== 'string' || !parsed.explanation) {
-    return { valid: false, error: 'Missing "explanation"', raw: rawText };
-  }
-  if (parsed.status === 'issue' && (typeof parsed.suggested_translation !== 'string' || !parsed.suggested_translation)) {
+
+  // Severity only matters for issues, and only as a display hint — an
+  // unrecognized value degrades to "minor" instead of failing the review.
+  let severity = null;
+  if (status === 'issue') severity = VALID_SEVERITIES.has(parsed.severity) ? parsed.severity : 'minor';
+
+  if (status === 'issue' && (typeof parsed.suggested_translation !== 'string' || !parsed.suggested_translation.trim())) {
     return { valid: false, error: 'Issue reported but no "suggested_translation" provided', raw: rawText };
   }
+
+  // A missing/empty explanation is cosmetic, not a reason to discard an
+  // otherwise-usable review (this was previously a hard failure and was the
+  // single most common cause of "Review failed" errors in practice).
+  const explanation = (typeof parsed.explanation === 'string' && parsed.explanation.trim())
+    ? parsed.explanation.trim()
+    : (status === 'issue' ? 'The model flagged this line but did not provide an explanation.' : 'No issues found (model did not provide an explanation).');
 
   return {
     valid: true,
     data: {
-      status: parsed.status,
-      severity: parsed.status === 'correct' ? null : (parsed.severity || 'minor'),
+      status,
+      severity,
       issue_type: parsed.issue_type || null,
-      explanation: parsed.explanation,
-      suggested_translation: parsed.status === 'issue' ? parsed.suggested_translation : null,
+      explanation,
+      suggested_translation: status === 'issue' ? parsed.suggested_translation.trim() : null,
       confidence: typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.7,
     },
   };
