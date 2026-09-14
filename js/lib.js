@@ -579,6 +579,21 @@ async function callConfiguredModel(systemPrompt, userPrompt) {
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+// Parses a "try again in 5m17.088s" / "retry after 23s" / "1h2m3s" style hint
+// out of a rate-limit error message and returns milliseconds, or null if no
+// such hint is present. Providers that include this (Groq, OpenAI-compatible
+// APIs) are telling us exactly when the limit resets — honoring it is far
+// more useful than guessing with a short exponential backoff that will just
+// fail again immediately for a daily-quota error.
+function parseRetryAfterMs(message) {
+  const m = (message || '').match(/try again in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i)
+    || (message || '').match(/retry after\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i);
+  if (!m) return null;
+  const h = parseFloat(m[1] || '0'), mi = parseFloat(m[2] || '0'), s = parseFloat(m[3] || '0');
+  const ms = Math.round((h * 3600 + mi * 60 + s) * 1000);
+  return ms > 0 ? ms : null;
+}
+
 async function callConfiguredModelWithRetry(systemPrompt, userPrompt, maxRetries) {
   maxRetries = maxRetries == null ? 4 : maxRetries;
   let lastErr;
@@ -596,7 +611,15 @@ async function callConfiguredModelWithRetry(systemPrompt, userPrompt, maxRetries
         || msg.includes('503') || msg.includes('overloaded') || msg.includes('failed to fetch')
         || msg.includes('networkerror') || msg.includes('load failed') || msg.includes('network request failed');
       if (!retryable || attempt === maxRetries) throw e;
-      await sleep(800 * Math.pow(2, attempt));
+
+      // A daily/quota rate limit (e.g. Groq's "tokens per day" cap) can say
+      // "try again in 5m17s" — a plain exponential backoff (maxing out
+      // around 12s) would exhaust all retries and fail long before that.
+      // Cap the honored wait at 6 minutes so one stuck request can't stall
+      // a whole review run indefinitely.
+      const hinted = parseRetryAfterMs(e.message);
+      const waitMs = hinted != null ? Math.min(hinted + 2000, 6 * 60 * 1000) : 800 * Math.pow(2, attempt);
+      await sleep(waitMs);
     }
   }
   throw lastErr;
